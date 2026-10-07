@@ -4,9 +4,11 @@
 
 // Import required components for 3D rendering
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid } from '@react-three/drei';
-import { Model as PottedPlant } from './components/PottedPlant';
-import { Cube } from './components/Cube';
+import { OrbitControls } from '@react-three/drei';
+import { useEffect, useState } from 'react';
+import { Room } from './components/Room';
+import { Underwater } from './components/Underwater';
+import { getTimeOfDay, currentHour } from './components/timeOfDay';
 
 // Import XR components for WebXR functionality (AR/VR)
 import { XR, createXRStore, XROrigin } from '@react-three/xr';
@@ -17,9 +19,20 @@ const store = createXRStore();
 
 // Main homepage component that renders our 3D scene with XR capabilities
 export default function Home() {
+  // Water colour follows the viewer's local time of day (re-checked every 30s)
+  const [hour, setHour] = useState(12);
+  useEffect(() => {
+    setHour(currentHour());
+    const id = setInterval(() => setHour(currentHour()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  const tod = getTimeOfDay(hour);
   return (
     // Container div that takes up the full viewport (100% width and height)
     <div style={{ width: '100vw', height: '100vh' }}>
+      <div style={{ position: 'absolute', top: 16, left: 16, zIndex: 10, padding: '8px 14px', borderRadius: 999, background: 'rgba(0,0,0,0.45)', color: '#fff', fontWeight: 600 }}>
+        {tod.label} · {String(Math.floor(hour)).padStart(2, '0')}:{String(Math.floor((hour % 1) * 60)).padStart(2, '0')}
+      </div>
       
       {/* 
         Canvas is the main React Three Fiber component that creates a 3D scene
@@ -29,7 +42,7 @@ export default function Home() {
         The XR component will automatically provide the default "Enter XR" UI
         which intelligently shows AR/VR options based on device capabilities
       */}
-      <Canvas camera={{ position: [5, 5, 5] }}>
+      <Canvas camera={{ position: [0, 1.6, 0.1] }}>
         
         {/* 
           XR WRAPPER
@@ -53,69 +66,12 @@ export default function Home() {
           - 4 units away on Z-axis (forward from scene center)
           This gives a nice diagonal view of both the cube and plant
         */}
-        <XROrigin position={[4, 1.6, 4]} />
+        <XROrigin position={[0, 0, 0]} />
         
-        {/* 
-          LIGHTING SETUP
-          We use multiple light sources to create depth and visual interest
-        */}
-        
-        {/* Ambient light provides soft, overall illumination without direction */}
-        <ambientLight intensity={0.4} />
-        
-        {/* Directional light simulates sunlight - comes from one direction */}
-        <directionalLight 
-          position={[10, 10, 5]}  // Position in 3D space [x, y, z]
-          intensity={1.0}         // How bright the light is
-          castShadow              // Enable this light to cast shadows
-        />
-        
-        {/* Point light radiates in all directions from a single point */}
-        <pointLight 
-          position={[-10, -10, -5]}  // Positioned opposite to main light
-          intensity={0.5}            // Dimmer than main light
-          color="#ffffff"            // Pure white light
-        />
-        
-        {/* Spot light creates a cone of light, like a flashlight */}
-        <spotLight
-          position={[0, 10, 0]}  // Directly above the scene
-          angle={0.3}            // Width of the light cone
-          penumbra={1}           // Softness of light edges (0 = sharp, 1 = very soft)
-          intensity={0.3}        // Gentle fill light
-          castShadow             // Enable shadow casting
-        />
-        
-        {/* 
-          3D OBJECTS
-          These are our interactive 3D elements in the scene
-        */}
-        
-        {/* Static orange cube positioned at the origin (0, 0, 0) */}
-        <Cube />
-        
-        {/* Interactive potted plant that can be clicked to teleport */}
-        <PottedPlant scale={10} />
-        
-        {/* 
-          SCENE HELPERS
-          Visual aids that help users understand the 3D space
-        */}
-        
-        {/* Grid floor provides spatial reference and depth perception */}
-        <Grid 
-          args={[20, 20]}           // Grid dimensions: 20x20 units
-          position={[0, -1, 0]}     // Positioned 1 unit below origin
-          cellSize={1}              // Each cell is 1x1 unit
-          cellThickness={0.5}       // Thin lines for individual cells
-          cellColor="#6f6f6f"       // Gray color for cell lines
-          sectionSize={5}           // Major grid lines every 5 cells
-          sectionThickness={1}      // Thicker lines for major sections
-          sectionColor="#9d4b4b"    // Reddish color for section lines
-          fadeDistance={25}         // Grid fades out at this distance
-          fadeStrength={1}          // How quickly the fade happens
-        />
-        
+        {/* Scene: lights, ground, fire, tent, trees, sky */}
+        <Room night={Math.min(1, Math.max(0, 1 - tod.sun / 1.4))} />
+        <Underwater tod={tod} />
+
         {/* 
           CAMERA CONTROLS
           OrbitControls allows users to navigate around the 3D scene
@@ -125,8 +81,9 @@ export default function Home() {
           Note: OrbitControls work in both regular 3D mode and XR mode
         */}
         <OrbitControls 
-          enablePan={true}      // Allow panning (moving the camera)
-          enableZoom={true}     // Allow zooming in/out
+          target={[0, 1.6, 0]}  // Look around from standing eye height in the room
+          enablePan={false}
+          enableZoom={false}
           enableRotate={true}   // Allow rotating around the scene
         />
         
